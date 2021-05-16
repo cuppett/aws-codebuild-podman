@@ -1,0 +1,414 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for Multi-Arch Builds (AARCH64, AMD64) based on CodeBuild w/podman
+
+Parameters:
+
+  BuildImageName:
+    Description: Build image name and tag
+    Type: String
+    Default: aws-codebuild-podman:latest
+
+  BuildTimeout:
+    Description: The timeout (in minutes) for the build step (5-480)
+    Type: Number
+    Default: 15
+    MinValue: 5
+    MaxValue: 480
+
+  Amd64BuildSize:
+    Description: Build instance type for AMD64 images (ARM64 has one option, LARGE)
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+    AllowedValues:
+      - "BUILD_GENERAL1_SMALL"
+      - "BUILD_GENERAL1_MEDIUM"
+      - "BUILD_GENERAL1_LARGE"
+
+  SquashLayers:
+    Description: Choose between no squash, squash or squash-all
+    Type: String
+    Default: squash
+    AllowedValues:
+      - "none"
+      - "squash"
+      - "squash-all"
+
+  LogsEnabled:
+    Description: Whether logs are enabled or not
+    Type: String
+    Default: ENABLED
+    AllowedValues:
+      - "ENABLED"
+      - "DISABLED"
+
+  LogRetention:
+    Description: How long to retain logs (in days)
+    Type: Number
+    MinValue: 1
+    Default: 7
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Build Settings"
+        Parameters:
+          - BuildImageName
+          - BuildTimeout
+          - Amd64BuildSize
+          - SquashLayers
+      - Label:
+          default: "Logging"
+        Parameters:
+          - LogsEnabled
+          - LogRetention
+    ParameterLabels:
+      BuildImageName:
+        default: "Build Image Name"
+      BuildTimeout:
+        default: "Build Timeout"
+      Amd64BuildSize:
+        default: "Size (AMD64)"
+      SquashLayers:
+        default: "Squash Layers"
+      LogsEnabled:
+        default: "Enabled"
+      LogRetention:
+        default: "Retention"
+
+Conditions:
+  HasSquash: !Not [!Equals ["none", !Ref SquashLayers]]
+
+Resources:
+
+  ContainerBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetention
+
+  ContainerBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      Policies:
+        - PolicyName: !Join ["-", [!Ref "AWS::StackName", "codebuild-log-policy"]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - !GetAtt ContainerBuildLogGroup.Arn
+        - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codebuild-ecr-policy" ]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:CompleteLayerUpload"
+                  - "ecr:TagResource"
+                  - "ecr:UploadLayerPart"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:PutImage"
+                Resource: !Join [":", ["arn:aws:ecr", !Ref "AWS::Region", !Ref "AWS::AccountId", "repository/*" ]]
+        - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codebuild-codepipeline-policy" ]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:GetBucketAcl"
+                  - "s3:GetBucketLocation"
+                Resource:
+                  - !GetAtt PipelineBucket.Arn
+                  - !Join ["", [!GetAtt PipelineBucket.Arn, "/*" ]]
+
+  Amd64Build:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: Build the AMD64 variant of a container
+      Environment:
+        ComputeType: !Ref "Amd64BuildSize"
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: build-amd64
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", "amd64", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join ["\n", [
+          "version: 0.2",
+          "phases:",
+          "  pre_build:",
+          "    commands:",
+          "      - echo Build started on `date`",
+          "      - echo Kernel version `uname -a`",
+          "      - echo Logging in to Amazon ECR...",
+          "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+          "  build:",
+          "    commands:",
+          "      - echo Building the container image...",
+          !Join ["", [
+              "      - podman build --cgroup-manager=cgroupfs",
+              !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
+              " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
+              " -f $CONTAINERFILE $CONTEXT_ROOT"
+          ]],
+          "  post_build:",
+          "    commands:",
+          "      - echo Build completed on `date`",
+          "      - echo Pushing the container image...",
+          "      - podman push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
+          "      - echo Build completed on `date`"]]
+        Type: CODEPIPELINE
+      TimeoutInMinutes: !Ref BuildTimeout
+
+  Aarch64Build:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: Build the ARM64 variant of a container
+      Environment:
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: ARM_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: build-aarch64
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", "aarch64", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join ["\n", [
+          "version: 0.2",
+          "phases:",
+          "  pre_build:",
+          "    commands:",
+          "      - echo Build started on `date`",
+          "      - echo Kernel version `uname -a`",
+          "      - echo Logging in to Amazon ECR...",
+          "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+          "  build:",
+          "    commands:",
+          "      - echo Building the container image...",
+          !Join ["", [
+              "      - podman build --cgroup-manager=cgroupfs",
+              !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
+              " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
+              " -f $CONTAINERFILE $CONTEXT_ROOT"
+          ]],
+          "  post_build:",
+          "    commands:",
+          "      - echo Build completed on `date`",
+          "      - echo Pushing the container image...",
+          "      - podman push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
+          "      - echo Build completed on `date`"]]
+        Type: CODEPIPELINE
+      TimeoutInMinutes: !Ref BuildTimeout
+
+  ManifestBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: no_artifacts
+      Description: Build the manifests for multiple architectures of a container
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: manifests
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join ["\n", [
+          "version: 0.2",
+          "phases:",
+          "  pre_build:",
+          "    commands:",
+          "      - echo Build started on `date`",
+          "      - echo Kernel version `uname -a`",
+          "      - echo Logging in to Amazon ECR...",
+          "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+          "  build:",
+          "    commands:",
+          "      - echo Building the container manifest...",
+          "      - podman manifest create $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG",
+          "      - podman manifest add --arch amd64 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
+          "      - podman manifest add --arch arm64 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
+          "  post_build:",
+          "    commands:",
+          "      - echo Pushing the container manifest...",
+          "      - podman manifest push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG",
+          "      - echo Build completed on `date`"]]
+        Type: NO_SOURCE
+      TimeoutInMinutes: 10
+
+  ContainerPipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Join ["-", [!Ref "AWS::StackName", "codepipeline-codebuild-policy"]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codebuild:BatchGetBuilds"
+                  - "codebuild:BatchGetBuildBatches"
+                  - "codebuild:StartBuild"
+                  - "codebuild:StartBuildBatch"
+                Resource:
+                  - !GetAtt Amd64Build.Arn
+                  - !GetAtt Aarch64Build.Arn
+                  - !GetAtt ManifestBuild.Arn
+        - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codepipeline-codecommit-policy" ]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codecommit:CancelUploadArchive"
+                  - "codecommit:GetBranch"
+                  - "codecommit:GetCommit"
+                  - "codecommit:GetRepository"
+                  - "codecommit:GetUploadArchiveStatus"
+                  - "codecommit:UploadArchive"
+                Resource: "*"
+        - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codepipeline-s3-policy" ]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:*"
+                Resource:
+                  - !GetAtt PipelineBucket.Arn
+                  - !Join ["", [!GetAtt PipelineBucket.Arn, "/*" ]]
+
+  PipelineTriggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Join ["-", [!Ref "AWS::StackName", "events-codepipeline-policy"]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codepipeline:StartPipelineExecution"
+                Resource: !Join [":", ["arn:aws:codepipeline", !Ref "AWS::Region", !Ref "AWS::AccountId", "*"]]
+
+  PipelineBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireRule
+            Status: Enabled
+            ExpirationInDays: 1
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  ContainerBuildLogGroup:
+    Description: Log group containing build and manifest build output
+    Value: !Ref ContainerBuildLogGroup
+  ContainerBuildRoleArn:
+    Description: Generic role allowing our pipeline actions
+    Value: !GetAtt ContainerBuildRole.Arn
+  AmdBuildName:
+    Description: Name of the AMD64 build to use
+    Value: !Ref Amd64Build
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "Amd64Build"]]
+  ArmBuildName:
+    Description: Name of the ARM64 build to use
+    Value: !Ref Aarch64Build
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "Aarch64Build"]]
+  ManifestBuildName:
+    Description: Name of the manifest build to use
+    Value: !Ref ManifestBuild
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "ManifestBuild"]]
+  PipelineBucket:
+    Description: CodePipeline S3 bucket name
+    Value: !Ref PipelineBucket
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "PipelineBucket"]]
+  PipelineRoleArn:
+    Description: Generic role allowing our pipeline actions
+    Value: !GetAtt ContainerPipelineRole.Arn
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "ContainerPipelineRoleArn"]]
+  PipelineTriggerRoleArn:
+    Description: Generic role allowing triggering our pipelines
+    Value: !GetAtt PipelineTriggerRole.Arn
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "PipelineTriggerRoleArn"]]
