@@ -23,7 +23,7 @@ Parameters:
     Type: String
 
   LifecyclePolicy:
-    Description: "See also: https://docs.aws.amazon.com/AmazonECR/latest/userguide/LifecyclePolicies.html#lp_count_type"
+    Description: "See also: https://docs.aws.amazon.com/AmazonECR/latest/userguide/LifecyclePolicies.html"
     Type: String
     MinLength: 100
     MaxLength: 30720
