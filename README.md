@@ -20,7 +20,7 @@ use podman in AWS CodeBuild.
 - [x] Create all required resources with [CloudFormation][cloudformation]
 - [x] Build multi-arch containers with CodeBuild and CodePipeline using podman
 - [x] Allow squashing image layers
-- [x] Pipelines triggerd periodically and on source code changes
+- [x] Pipelines triggered periodically and on source code changes
 - [ ] Support S2I builders
 - [x] Support FROM replacement & image triggers with private ECR repositories
 - [ ] Support operator builds with Operator SDK & deployments to EKS & OpenShift
