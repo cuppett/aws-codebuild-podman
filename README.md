@@ -22,7 +22,7 @@ use podman in AWS CodeBuild.
 - [x] Allow squashing image layers
 - [x] Pipelines triggerd periodically and on source code changes
 - [ ] Support S2I builders
-- [ ] Support FROM replacement & image triggers with private ECR repositories
+- [x] Support FROM replacement & image triggers with private ECR repositories
 - [ ] Support operator builds with Operator SDK & deployments to EKS & OpenShift
 - [ ] Support external repositories (Github, quay.io)
 

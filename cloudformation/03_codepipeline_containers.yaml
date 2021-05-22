@@ -30,6 +30,13 @@ Parameters:
     AllowedValues:
       - true
       - false
+  PipelineImageTrigger:
+    Description: When using local image replacement, trigger on image change?
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
   Branch:
     Description: "Branch or reference to use in the source repository. (See also: https://docs.aws.amazon.com/codebuild/latest/userguide/sample-source-version.html)"
     Type: String
@@ -46,6 +53,12 @@ Parameters:
     Description: The file to use for the container build (e.g. Containerfile or Dockerfile)
     Type: String
     Default: "Containerfile"
+  ContainerFromRepo:
+    Description: A local ECR replacement FROM for the container builds (if different from the Containerfile).
+    Type: String
+  ContainerFromTag:
+    Description: A local ECR replacement FROM for the container builds (if different from the Containerfile).
+    Type: String
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -56,10 +69,11 @@ Metadata:
           - BuildStackName
           - RepositoryStackName
       - Label:
-          default: "Pipeline Information"
+          default: "Pipeline Trigger Information"
         Parameters:
           - PipelineFrequency
           - PipelineSourceTrigger
+          - PipelineImageTrigger
       - Label:
           default: "Source Repository Information"
         Parameters:
@@ -73,6 +87,11 @@ Metadata:
         Parameters:
           - ContextRoot
           - Containerfile
+      - Label:
+          default: "FROM Replacement"
+        Parameters:
+          - ContainerFromRepo
+          - ContainerFromTag
     ParameterLabels:
       BuildStackName:
         default: "Build Stack Name"
@@ -82,12 +101,22 @@ Metadata:
         default: "Pipeline Frequency"
       PipelineSourceTrigger:
         default: "Pipeline Source Trigger"
+      PipelineImageTrigger:
+        default: "Pipeline ECR Image Trigger"
       TargetTag:
         default: "Target Tag"
+      ContainerFromRepo:
+        default: "ECR Base Image Repository"
+      ContainerFromTag:
+        default: "ECR Base Image Tag"
 
 Conditions:
   HasRate: !Not [!Equals ["none", !Ref PipelineFrequency]]
   EnableSourceTrigger: !Equals ["true", !Ref PipelineSourceTrigger]
+  EnableImageTrigger: !Equals ["true", !Ref PipelineImageTrigger]
+  HasContainerFromRepo: !Not [!Equals ["", !Ref ContainerFromRepo]]
+  HasContainerFromTag: !Not [!Equals ["", !Ref ContainerFromTag]]
+  NeedImageTrigger: !And [!Condition HasContainerFromRepo, !Condition EnableImageTrigger]
 
 Resources:
   Pipeline:
@@ -132,6 +161,9 @@ Resources:
                 EnvironmentVariables: !Join ["", ["[",
                     "{\"name\":\"IMAGE_TAG\",\"value\":\"", !Ref TargetTag, "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"IMAGE_REPO_NAME\",\"value\":\"", Fn::ImportValue: !Sub "${RepositoryStackName}-ImageRepositoryName", "\",\"type\":\"PLAINTEXT\"},",
+                    "{\"name\":\"FROM\",\"value\":\"", !If [ HasContainerFromRepo,
+                    !Join [ "", [ !Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref ContainerFromRepo,
+                                  !If [ HasContainerFromTag, !Join [ "", [ ":", !Ref ContainerFromTag ] ], "" ] ] ], "" ], "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTAINERFILE\",\"value\":\"", !Ref Containerfile, "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"}",
                     "]"
@@ -151,6 +183,9 @@ Resources:
                 EnvironmentVariables: !Join ["", ["[",
                     "{\"name\":\"IMAGE_TAG\",\"value\":\"", !Ref TargetTag, "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"IMAGE_REPO_NAME\",\"value\":\"", Fn::ImportValue: !Sub "${RepositoryStackName}-ImageRepositoryName", "\",\"type\":\"PLAINTEXT\"},",
+                    "{\"name\":\"FROM\",\"value\":\"", !If [ HasContainerFromRepo,
+                    !Join [ "", [ !Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref ContainerFromRepo,
+                                  !If [ HasContainerFromTag, !Join [ "", [ ":", !Ref ContainerFromTag ] ], "" ] ] ], "" ], "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTAINERFILE\",\"value\":\"", !Ref Containerfile, "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"}",
                     "]"
@@ -214,4 +249,28 @@ Resources:
         - Arn: !Join [":", ["arn:aws:codepipeline", !Ref "AWS::Region", !Ref "AWS::AccountId", !Ref Pipeline]]
           RoleArn: !ImportValue
             'Fn::Sub': '${BuildStackName}-PipelineTriggerRoleArn'
+          Id: !Join ["-", ["codepipeline", !Ref "AWS::StackName"]]
+
+  PipelineImageRule:
+    Type: AWS::Events::Rule
+    Condition: NeedImageTrigger
+    Properties:
+      Description: "Trigger container pipeline on image changes"
+      EventPattern:
+        source:
+          - aws.ecr
+        detail-type:
+          - ECR Image Action
+        detail:
+          action-type:
+            - PUSH
+          result:
+            - SUCCESS
+          repository-name:
+            - !Ref ContainerFromRepo
+          image-tag:
+            - !If [HasContainerFromTag, !Ref ContainerFromTag, "latest"]
+      Targets:
+        - Arn: !Join [ ":", [ "arn:aws:codepipeline", !Ref "AWS::Region", !Ref "AWS::AccountId", !Ref Pipeline ] ]
+          RoleArn: !ImportValue PipelineTriggerRoleArn
           Id: !Join ["-", ["codepipeline", !Ref "AWS::StackName"]]

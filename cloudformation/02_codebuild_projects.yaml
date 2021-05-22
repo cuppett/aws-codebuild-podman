@@ -176,6 +176,7 @@ Resources:
           !Join ["", [
               "      - podman build --cgroup-manager=cgroupfs",
               !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
+              " ${FROM:+--from $FROM}",
               " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
               " -f $CONTAINERFILE $CONTEXT_ROOT"
           ]],
@@ -226,6 +227,7 @@ Resources:
           !Join ["", [
               "      - podman build --cgroup-manager=cgroupfs",
               !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
+              " ${FROM:+--from $FROM}",
               " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
               " -f $CONTAINERFILE $CONTEXT_ROOT"
           ]],
