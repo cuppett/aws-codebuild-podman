@@ -21,7 +21,7 @@ use podman in AWS CodeBuild.
 - [x] Build multi-arch containers with CodeBuild and CodePipeline using podman
 - [x] Allow squashing image layers
 - [x] Pipelines triggered periodically and on source code changes
-- [ ] Support S2I builders
+- [x] Support S2I builders
 - [x] Support FROM replacement & image triggers with private ECR repositories
 - [ ] Support operator builds with Operator SDK & deployments to EKS & OpenShift
 - [ ] Support external repositories (Github, quay.io)

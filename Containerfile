@@ -21,6 +21,7 @@ RUN set -ex; \
     dnf -y install \
         awscli \
         podman \
+        source-to-image \
     ; \
     dnf -y clean all; \
     rm -rf /var/cache/dnf

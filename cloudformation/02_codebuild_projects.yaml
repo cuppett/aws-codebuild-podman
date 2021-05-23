@@ -189,6 +189,59 @@ Resources:
         Type: CODEPIPELINE
       TimeoutInMinutes: !Ref BuildTimeout
 
+  Amd64S2iBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: Build the AMD64 variant of a container using S2I
+      Environment:
+        ComputeType: !Ref "Amd64BuildSize"
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: build-amd64-s2i
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", "amd64-s2i", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join ["\n", [
+          "version: 0.2",
+          "phases:",
+          "  pre_build:",
+          "    commands:",
+          "      - echo Build started on `date`",
+          "      - echo Kernel version `uname -a`",
+          "      - echo Logging in to Amazon ECR...",
+          "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+          "  build:",
+          "    commands:",
+          "      - echo Building the container image...",
+          "      - mkdir /tmp/build && cd /tmp/build",
+          "      - s2i build $CODEBUILD_SRC_DIR/$CONTEXT_ROOT $BUILDER_IMAGE --as-dockerfile Containerfile.s2i",
+          !Join ["", [
+              "      - podman build --cgroup-manager=cgroupfs",
+              !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
+              " ${FROM:+--from $FROM}",
+              " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
+              " -f Containerfile.s2i ./"
+          ]],
+          "  post_build:",
+          "    commands:",
+          "      - echo Build completed on `date`",
+          "      - echo Pushing the container image...",
+          "      - podman push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
+          "      - echo Build completed on `date`"]]
+        Type: CODEPIPELINE
+      TimeoutInMinutes: !Ref BuildTimeout
+
   Aarch64Build:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -237,6 +290,59 @@ Resources:
           "      - echo Pushing the container image...",
           "      - podman push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
           "      - echo Build completed on `date`"]]
+        Type: CODEPIPELINE
+      TimeoutInMinutes: !Ref BuildTimeout
+
+  Aarch64S2iBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: Build the ARM64 variant of a container using S2I
+      Environment:
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: ARM_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: build-aarch64-s2i
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", "aarch64-s2i", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join ["\n", [
+            "version: 0.2",
+            "phases:",
+            "  pre_build:",
+            "    commands:",
+            "      - echo Build started on `date`",
+            "      - echo Kernel version `uname -a`",
+            "      - echo Logging in to Amazon ECR...",
+            "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+            "  build:",
+            "    commands:",
+            "      - echo Building the container image...",
+            "      - mkdir /tmp/build && cd /tmp/build",
+            "      - s2i build $CODEBUILD_SRC_DIR/$CONTEXT_ROOT $BUILDER_IMAGE --as-dockerfile Containerfile.s2i",
+          !Join ["", [
+              "      - podman build --cgroup-manager=cgroupfs",
+              !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
+              " ${FROM:+--from $FROM}",
+              " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
+              " -f Containerfile.s2i ./"
+          ]],
+            "  post_build:",
+            "    commands:",
+            "      - echo Build completed on `date`",
+            "      - echo Pushing the container image...",
+            "      - podman push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
+            "      - echo Build completed on `date`"]]
         Type: CODEPIPELINE
       TimeoutInMinutes: !Ref BuildTimeout
 
@@ -312,6 +418,8 @@ Resources:
                 Resource:
                   - !GetAtt Amd64Build.Arn
                   - !GetAtt Aarch64Build.Arn
+                  - !GetAtt Amd64S2iBuild.Arn
+                  - !GetAtt Aarch64S2iBuild.Arn
                   - !GetAtt ManifestBuild.Arn
         - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codepipeline-codecommit-policy" ]]
           PolicyDocument:
@@ -394,6 +502,16 @@ Outputs:
     Value: !Ref Aarch64Build
     Export:
       Name: !Join ["-", [!Ref "AWS::StackName", "Aarch64Build"]]
+  AmdS2iBuildName:
+    Description: Name of the AMD64 S2I build to use
+    Value: !Ref Amd64S2iBuild
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "Amd64S2iBuild"]]
+  ArmS2iBuildName:
+    Description: Name of the ARM64 S2I build to use
+    Value: !Ref Aarch64S2iBuild
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "Aarch64S2iBuild"]]
   ManifestBuildName:
     Description: Name of the manifest build to use
     Value: !Ref ManifestBuild
