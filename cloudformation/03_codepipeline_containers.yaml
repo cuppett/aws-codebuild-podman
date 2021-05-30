@@ -2,6 +2,13 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Template for Multi-Arch Container Pipelines (AARCH64, AMD64) based on CodePipeline
 
 Parameters:
+  BuildStrategy:
+    Description: Type of repository and method to use
+    Type: String
+    Default: Containerfile
+    AllowedValues:
+    - "Containerfile"
+    - "Source-to-Image"
   BuildStackName:
     Description: Name of the stack containing build projects, roles & pipeline bucket
     Type: String
@@ -85,6 +92,7 @@ Metadata:
       - Label:
           default: "Build Parameters"
         Parameters:
+          - BuildStrategy
           - ContextRoot
           - Containerfile
       - Label:
@@ -93,6 +101,8 @@ Metadata:
           - ContainerFromRepo
           - ContainerFromTag
     ParameterLabels:
+      BuildStrategy:
+        default: "Build Strategy"
       BuildStackName:
         default: "Build Stack Name"
       RepositoryStackName:
@@ -117,6 +127,7 @@ Conditions:
   HasContainerFromRepo: !Not [!Equals ["", !Ref ContainerFromRepo]]
   HasContainerFromTag: !Not [!Equals ["", !Ref ContainerFromTag]]
   NeedImageTrigger: !And [!Condition HasContainerFromRepo, !Condition EnableImageTrigger]
+  S2I: !Equals [ "Source-to-Image", !Ref BuildStrategy ]
 
 Resources:
   Pipeline:
@@ -165,7 +176,8 @@ Resources:
                     !Join [ "", [ !Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref ContainerFromRepo,
                                   !If [ HasContainerFromTag, !Join [ "", [ ":", !Ref ContainerFromTag ] ], "" ] ] ], "" ], "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTAINERFILE\",\"value\":\"", !Ref Containerfile, "\",\"type\":\"PLAINTEXT\"},",
-                    "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"}",
+                    "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"},",
+                    "{\"name\":\"S2I\",\"value\":\"", !If [S2I, "true", ""], "\",\"type\":\"PLAINTEXT\"}",
                     "]"
                 ]]
               Region: !Ref "AWS::Region"
@@ -187,7 +199,8 @@ Resources:
                     !Join [ "", [ !Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref ContainerFromRepo,
                                   !If [ HasContainerFromTag, !Join [ "", [ ":", !Ref ContainerFromTag ] ], "" ] ] ], "" ], "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTAINERFILE\",\"value\":\"", !Ref Containerfile, "\",\"type\":\"PLAINTEXT\"},",
-                    "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"}",
+                    "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"},",
+                    "{\"name\":\"S2I\",\"value\":\"", !If [S2I, "true", ""], "\",\"type\":\"PLAINTEXT\"}",
                     "]"
                 ]]
               Region: !Ref "AWS::Region"
