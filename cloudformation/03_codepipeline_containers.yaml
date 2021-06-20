@@ -9,6 +9,10 @@ Parameters:
     AllowedValues:
     - "Containerfile"
     - "Source-to-Image"
+  BuilderImage:
+    Description: "Self-assembling builder image to use (See also: https://github.com/openshift/source-to-image)"
+    Type: String
+    Default: registry.fedoraproject.org/f34/s2i-base
   BuildStackName:
     Description: Name of the stack containing build projects, roles & pipeline bucket
     Type: String
@@ -93,6 +97,7 @@ Metadata:
           default: "Build Parameters"
         Parameters:
           - BuildStrategy
+          - BuilderImage
           - ContextRoot
           - Containerfile
       - Label:
@@ -103,6 +108,8 @@ Metadata:
     ParameterLabels:
       BuildStrategy:
         default: "Build Strategy"
+      BuilderImage:
+        default: "Builder Image (S2I only)"
       BuildStackName:
         default: "Build Stack Name"
       RepositoryStackName:
@@ -177,7 +184,8 @@ Resources:
                                   !If [ HasContainerFromTag, !Join [ "", [ ":", !Ref ContainerFromTag ] ], "" ] ] ], "" ], "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTAINERFILE\",\"value\":\"", !Ref Containerfile, "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"},",
-                    "{\"name\":\"S2I\",\"value\":\"", !If [S2I, "true", ""], "\",\"type\":\"PLAINTEXT\"}",
+                    "{\"name\":\"S2I\",\"value\":\"", !If [S2I, "true", ""], "\",\"type\":\"PLAINTEXT\"},",
+                    "{\"name\":\"BUILDER_IMAGE\",\"value\":\"", !If [S2I, !Ref BuilderImage, ""], "\",\"type\":\"PLAINTEXT\"}",
                     "]"
                 ]]
               Region: !Ref "AWS::Region"
@@ -200,7 +208,8 @@ Resources:
                                   !If [ HasContainerFromTag, !Join [ "", [ ":", !Ref ContainerFromTag ] ], "" ] ] ], "" ], "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTAINERFILE\",\"value\":\"", !Ref Containerfile, "\",\"type\":\"PLAINTEXT\"},",
                     "{\"name\":\"CONTEXT_ROOT\",\"value\":\"", !Ref ContextRoot, "\",\"type\":\"PLAINTEXT\"},",
-                    "{\"name\":\"S2I\",\"value\":\"", !If [S2I, "true", ""], "\",\"type\":\"PLAINTEXT\"}",
+                    "{\"name\":\"S2I\",\"value\":\"", !If [S2I, "true", ""], "\",\"type\":\"PLAINTEXT\"},",
+                    "{\"name\":\"BUILDER_IMAGE\",\"value\":\"", !If [S2I, !Ref BuilderImage, ""], "\",\"type\":\"PLAINTEXT\"}",
                     "]"
                 ]]
               Region: !Ref "AWS::Region"
