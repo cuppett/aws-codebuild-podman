@@ -20,7 +20,10 @@ RUN set -ex; \
     \
     dnf -y install \
         awscli \
+        golang \
         podman \
+        podman-docker \
+        make \
         source-to-image \
     ; \
     dnf -y clean all; \
@@ -28,7 +31,9 @@ RUN set -ex; \
 
 # Preparing container tools support for CodeBuild kernels
 RUN set -ex; \
+    touch /etc/containers/nodocker; \
     sed -i 's/,metacopy\=on//g' /etc/containers/storage.conf; \
     sed -i 's/\#mount_program/mount_program/g' /etc/containers/storage.conf; \
     echo "[engine]" > /etc/containers/containers.conf; \
-    echo "events_logger = \"file\"" >> /etc/containers/containers.conf;
+    echo "events_logger = \"file\"" >> /etc/containers/containers.conf; \
+    echo "cgroup_manager = \"cgroupfs\"" >> /etc/containers/containers.conf;

@@ -177,7 +177,7 @@ Resources:
           "      - if [ ${S2I} ]; then s2i build $CODEBUILD_SRC_DIR/$CONTEXT_ROOT $BUILDER_IMAGE --as-dockerfile $CONTAINERFILE; fi",
           "      - echo Building the container image...",
           !Join ["", [
-              "      - podman build --cgroup-manager=cgroupfs",
+              "      - podman build ",
               !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
               " ${FROM:+--from $FROM}",
               " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64",
@@ -231,7 +231,7 @@ Resources:
           "      - if [ ${S2I} ]; then s2i build $CODEBUILD_SRC_DIR/$CONTEXT_ROOT $BUILDER_IMAGE --as-dockerfile $CONTAINERFILE; fi",
           "      - echo Building the container image...",
           !Join ["", [
-              "      - podman build --cgroup-manager=cgroupfs",
+              "      - podman build ",
               !If [ HasSquash, !Join ["", [" --", !Ref SquashLayers]], ""],
               " ${FROM:+--from $FROM}",
               " -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64",
@@ -245,6 +245,82 @@ Resources:
           "      - echo Build completed on `date`"]]
         Type: CODEPIPELINE
       TimeoutInMinutes: !Ref BuildTimeout
+
+  OperatorAmd64Build:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: Build the AMD64 variant of an operator
+      Environment:
+        ComputeType: !Ref "Amd64BuildSize"
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: build-operator-amd64
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", "operator-amd64", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join [ "\n", [
+            "version: 0.2",
+            "phases:",
+            "  pre_build:",
+            "    commands:",
+            "      - echo Logging in to Amazon ECR...",
+            "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+            "  build:",
+            "    commands:",
+            "      - echo Build started on `date`",
+            "      - echo Building the operator image...",
+            "      - make docker-build docker-push IMG=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-amd64"]]
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 30
+
+  OperatorAarch64Build:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: Build the ARM64 variant of an operator
+      Environment:
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: true
+        Type: ARM_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref "AWS::AccountId"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref ContainerBuildLogGroup
+          StreamName: build-operator-aarch64
+          Status: !Ref LogsEnabled
+      Name: !Join ["-", [!Ref "AWS::StackName", "operator-aarch64", !Ref "AWS::Region"]]
+      ServiceRole: !Ref ContainerBuildRole
+      Source:
+        BuildSpec: !Join [ "\n", [
+            "version: 0.2",
+            "phases:",
+            "  pre_build:",
+            "    commands:",
+            "      - echo Logging in to Amazon ECR...",
+            "      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | podman login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com",
+            "  build:",
+            "    commands:",
+            "      - echo Build started on `date`",
+            "      - echo Building the operator image...",
+            "      - make docker-build docker-push IMG=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG-aarch64"]]
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 30
 
   ManifestBuild:
     Type: AWS::CodeBuild::Project
@@ -318,6 +394,8 @@ Resources:
                 Resource:
                   - !GetAtt Amd64Build.Arn
                   - !GetAtt Aarch64Build.Arn
+                  - !GetAtt OperatorAmd64Build.Arn
+                  - !GetAtt OperatorAarch64Build.Arn
                   - !GetAtt ManifestBuild.Arn
         - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codepipeline-codecommit-policy" ]]
           PolicyDocument:
@@ -400,6 +478,16 @@ Outputs:
     Value: !Ref Aarch64Build
     Export:
       Name: !Join ["-", [!Ref "AWS::StackName", "Aarch64Build"]]
+  OperatorAmdBuildName:
+    Description: Name of the AMD64 operator build to use
+    Value: !Ref OperatorAmd64Build
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "OperatorAmd64Build"]]
+  OperatorArmBuildName:
+    Description: Name of the ARM64 operator build to use
+    Value: !Ref OperatorAarch64Build
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "OperatorAarch64Build"]]
   ManifestBuildName:
     Description: Name of the manifest build to use
     Value: !Ref ManifestBuild

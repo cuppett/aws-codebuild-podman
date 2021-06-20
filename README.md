@@ -23,7 +23,9 @@ use podman in AWS CodeBuild.
 - [x] Pipelines triggered periodically and on source code changes
 - [x] Support S2I builders
 - [x] Support FROM replacement & image triggers with private ECR repositories
-- [ ] Support operator builds with Operator SDK & deployments to EKS & OpenShift
+- [x] Support operator builds with Operator SDK 
+- [ ] Support deployments to EKS
+- [ ] Support deployments to OpenShift
 - [ ] Support external repositories (Github, quay.io)
 
 ## Pre-requisites
@@ -156,7 +158,8 @@ TBD: Picture of the Build Projects
 
 ## Creating the Pipeline
 A shared set of CodePipeline steps and the pipeline itself are codified in
-[03_codepipeline_containers.yaml](cloudformation/03_codepipeline_containers.yaml).
+[03_codepipeline_containers.yaml](cloudformation/03_codepipeline_containers.yaml)
+or [03_codepipeline_operators.yaml](cloudformation/03_codepipeline_operators.yaml).
 This file is versioned in the branch to set the parameters required for the
 CodeBuild projects defined in the lower stack.
 To create a pipeline and this stack, you will reference the unique repository
@@ -187,15 +190,17 @@ For additional image builds using a repository, you only need to create more of 
 following two stacks:
 
 1. [01_repositories.yaml](cloudformation/01_repositories.yaml)
-2. [03_codepipeline_containers.yaml](cloudformation/03_codepipeline_containers.yaml)
+2. [03_codepipeline_containers.yaml](cloudformation/03_codepipeline_containers.yaml) or
+   [03_codepipeline_operators.yaml](cloudformation/03_codepipeline_operators.yaml)
 
 In #1, you'll create unique names for the repositories. In #3, you'll reference the shared
-build stacks again and the unique repositories stack from #1.
+build stacks again, and the unique repositories stack from #1.
 
 ### Same repository, different branch or tag
 
 For additional image builds using the same repository, you only need to create a separate
-pipeline stack, [03_codepipeline_containers.yaml](cloudformation/03_codepipeline_containers.yaml)
+pipeline stack, [03_codepipeline_containers.yaml](cloudformation/03_codepipeline_containers.yaml) or
+[03_codepipeline_operators.yaml](cloudformation/03_codepipeline_operators.yaml).
 
 In the stack, you'll reference the same repository stack and the shared
 build stacks.
