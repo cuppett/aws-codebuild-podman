@@ -78,6 +78,7 @@ Metadata:
 
 Conditions:
   HasSquash: !Not [!Equals ["none", !Ref SquashLayers]]
+  ArmSmall: !Equals ["BUILD_GENERAL1_SMALL", !Ref Amd64BuildSize]
 
 Resources:
 
@@ -199,7 +200,7 @@ Resources:
         Type: CODEPIPELINE
       Description: Build the ARM64 variant of a container
       Environment:
-        ComputeType: BUILD_GENERAL1_LARGE
+        ComputeType: !If [ArmSmall, "BUILD_GENERAL1_SMALL", "BUILD_GENERAL1_LARGE"]
         Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
         ImagePullCredentialsType: SERVICE_ROLE
         PrivilegedMode: true
@@ -291,7 +292,7 @@ Resources:
         Type: CODEPIPELINE
       Description: Build the ARM64 variant of an operator
       Environment:
-        ComputeType: BUILD_GENERAL1_LARGE
+        ComputeType: !If [ArmSmall, "BUILD_GENERAL1_SMALL", "BUILD_GENERAL1_LARGE"]
         Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
         ImagePullCredentialsType: SERVICE_ROLE
         PrivilegedMode: true
