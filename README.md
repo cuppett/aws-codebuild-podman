@@ -24,7 +24,7 @@ use podman in AWS CodeBuild.
 - [x] Support S2I builders
 - [x] Support FROM replacement & image triggers with private ECR repositories
 - [x] Support operator builds with [Operator SDK](https://sdk.operatorframework.io/)
-- [ ] Support external repositories (Github, quay.io)
+- [x] Support external repositories (Github, Bitbucket)
 
 ## Pre-requisites
 - An AWS Account

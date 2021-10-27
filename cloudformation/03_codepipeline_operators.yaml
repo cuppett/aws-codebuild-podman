@@ -2,10 +2,20 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Template for Multi-Arch Operator SDK Builds (AARCH64, AMD64) based on CodeCommit & CodePipeline w/Source Trigger
 
 Parameters:
+  BuildSource:
+    Description: Type of repository
+    Type: String
+    Default: CodeCommit
+    AllowedValues:
+      - "CodeCommit"
+      - "CodeStarSourceConnection"
   BuildStackName:
     Description: Name of the stack containing build projects, roles & pipeline bucket
     Type: String
     Default: aws-codebuild-podman
+  CodeStarConnectionArn:
+    Description: ARN of the connection (for GitHub or Bitbucket repositories)
+    Type: String
   RepositoryStackName:
     Description: Name of the stack containing source and image repositories
     Type: String
@@ -60,9 +70,18 @@ Metadata:
           default: "Container Repository Information"
         Parameters:
           - TargetTag
+      - Label:
+          default: "Build Parameters"
+        Parameters:
+          - BuildSource
+          - CodeStarConnectionArn
     ParameterLabels:
+      BuildSource:
+        default: "Build Source"
       BuildStackName:
         default: "Build Stack Name"
+      CodeStarConnectionArn:
+        default: "CodeStar Connection ARN"
       RepositoryStackName:
         default: "Repository Stack Name"
       PipelineFrequency:
@@ -76,7 +95,9 @@ Metadata:
 
 Conditions:
   HasRate: !Not [!Equals ["none", !Ref PipelineFrequency]]
+  IsCodeCommit: !Equals ["CodeCommit", !Ref BuildSource]
   EnableSourceTrigger: !Equals ["true", !Ref PipelineSourceTrigger]
+  EnableEventRuleSourceTrigger: !And [!Condition IsCodeCommit, !Condition EnableSourceTrigger]
 
 Resources:
 
@@ -91,23 +112,42 @@ Resources:
       RoleArn: !ImportValue
         'Fn::Sub': '${BuildStackName}-ContainerPipelineRoleArn'
       Stages:
-        - Name: Source
-          Actions:
-            - Name: Source
-              ActionTypeId:
-                Category: Source
-                Owner: AWS
-                Provider: CodeCommit
-                Version: 1
-              Configuration:
-                BranchName: !Ref Branch
-                PollForSourceChanges: false
-                RepositoryName: !ImportValue
-                  'Fn::Sub': '${RepositoryStackName}-SourceRepositoryName'
-              Region: !Ref "AWS::Region"
-              OutputArtifacts:
-                - Name: SourceArtifact
-              Namespace: SourceVariables
+        - !If
+          - IsCodeCommit
+          - Name: Source
+            Actions:
+              - Name: Source
+                ActionTypeId:
+                  Category: Source
+                  Owner: AWS
+                  Provider: CodeCommit
+                  Version: 1
+                Configuration:
+                  BranchName: !Ref Branch
+                  PollForSourceChanges: false
+                  RepositoryName: !ImportValue
+                    'Fn::Sub': '${RepositoryStackName}-SourceRepositoryName'
+                Region: !Ref "AWS::Region"
+                OutputArtifacts:
+                  - Name: SourceArtifact
+                Namespace: SourceVariables
+          - Name: Source
+            Actions:
+              - Name: Source
+                ActionTypeId:
+                  Category: Source
+                  Owner: AWS
+                  Provider: CodeStarSourceConnection
+                  Version: 1
+                Configuration:
+                  ConnectionArn: !Ref CodeStarConnectionArn
+                  BranchName: !Ref Branch
+                  DetectChanges: !If [EnableSourceTrigger, true, false]
+                  FullRepositoryId: !ImportValue
+                    'Fn::Sub': '${RepositoryStackName}-SourceRepositoryName'
+                OutputArtifacts:
+                  - Name: SourceArtifact
+                Namespace: SourceVariables
         - Name: Build-Operators
           Actions:
             - Name: Build-AMD
@@ -166,7 +206,7 @@ Resources:
 
   PipelineSourceRule:
     Type: AWS::Events::Rule
-    Condition: EnableSourceTrigger
+    Condition: EnableEventRuleSourceTrigger
     Properties:
       Description: "Trigger container pipeline on source changes"
       EventPattern:

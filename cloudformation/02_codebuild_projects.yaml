@@ -421,6 +421,14 @@ Resources:
                 Resource:
                   - !GetAtt PipelineBucket.Arn
                   - !Join ["", [!GetAtt PipelineBucket.Arn, "/*" ]]
+        - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codestar-connection-policy" ]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codestar-connections:UseConnection"
+                Resource: "*"
 
   PipelineTriggerRole:
     Type: AWS::IAM::Role

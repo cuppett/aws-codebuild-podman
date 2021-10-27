@@ -2,11 +2,20 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Template for CodeCommit and ECR Repositories
 
 Parameters:
+
+  CreateSourceRepository:
+    Description: Should a CodeCommit repository be created (false for GitHub/Bitbucket)?
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+
   SourceRepositoryName:
-    Description: Name used for the CodeCommit repository
+    Description: Name used for the CodeCommit/GitHub/Bitbucket repository
     MinLength: 1
     MaxLength: 100
-    AllowedPattern: ^[\w\.-]+
+    AllowedPattern: ^[\w/\.-]+
     Type: String
 
   SourceRepositoryDescription:
@@ -35,6 +44,7 @@ Metadata:
       - Label:
           default: "Source Repository Settings"
         Parameters:
+          - CreateSourceRepository
           - SourceRepositoryName
           - SourceRepositoryDescription
       - Label:
@@ -43,6 +53,8 @@ Metadata:
           - ImageRepositoryName
           - LifecyclePolicy
     ParameterLabels:
+      CreateSourceRepository:
+        default: "Create Source Repository?"
       SourceRepositoryName:
         default: "Source Repository Name"
       SourceRepositoryDescription:
@@ -52,9 +64,13 @@ Metadata:
       LifecyclePolicy:
         default: "Lifecycle Policy"
 
+Conditions:
+  CreateSourceRepository: !Equals ["true", !Ref CreateSourceRepository]
+
 Resources:
   SourceRepository:
     Type: AWS::CodeCommit::Repository
+    Condition: CreateSourceRepository
     Properties:
       RepositoryDescription: !Ref SourceRepositoryDescription
       RepositoryName: !Ref SourceRepositoryName
@@ -70,7 +86,7 @@ Resources:
 
 Outputs:
   SourceRepository:
-    Description: Name used for the CodeCommit repository
+    Description: Name used for the CodeCommit/GitHub/Bitbucket repository
     Value: !Ref SourceRepositoryName
     Export:
       Name: !Join ["-", [!Ref "AWS::StackName", "SourceRepositoryName"]]
