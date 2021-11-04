@@ -110,7 +110,7 @@ $ aws ecr --profile cuppett --region us-east-1 get-login-password \
 Login Succeeded!
 ```
 
-For my public tag, I’m going to use “f34” to represent Fedora 34. 
+For my public tag, I’m going to use “f35” to represent Fedora 35. 
 We could also use “latest” here or “main” to represent the branch; 
 however, I want to be explicit which distribution and version is underneath 
 and how that may correspond to the things in the Containerfile or any other 
@@ -118,7 +118,7 @@ idiosyncrasies observed or recorded in the logs.
 
 ```bash
 $ podman manifest push aws-codebuild-podman \
-  123456789.dkr.ecr.us-east-1.amazonaws.com/aws-codebuild-podman:f34
+  123456789.dkr.ecr.us-east-1.amazonaws.com/aws-codebuild-podman:f35
 ```
 Upon successful completion of this command, the image is now available in AWS, and we can 
 begin creating pipelines and referencing this image in build jobs.
@@ -135,8 +135,8 @@ Those elements are captured both in the [Containerfile](Containerfile) and also 
 
 As of this writing here are the versions used/observed in this project:
 
-* Fedora: 34
-* Podman: 3.1.2 go1.16.3
+* Fedora: 35
+* Podman: 3.4.1 go1.16.8
 * CodeBuild kernel: 4.14.225-121.362.amzn1.x86_64
 
 Once again, you will create a new CloudFormation stack this time using the 
