@@ -35,5 +35,6 @@ RUN set -ex; \
     sed -i 's/,metacopy\=on//g' /etc/containers/storage.conf; \
     sed -i 's/\#mount_program/mount_program/g' /etc/containers/storage.conf; \
     echo "[engine]" > /etc/containers/containers.conf; \
+    echo "image_default_format = \"v2s2\"" >> /etc/containers/containers.conf; \
     echo "events_logger = \"file\"" >> /etc/containers/containers.conf; \
     echo "cgroup_manager = \"cgroupfs\"" >> /etc/containers/containers.conf;
