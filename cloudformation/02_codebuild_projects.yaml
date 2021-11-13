@@ -512,6 +512,11 @@ Outputs:
     Value: !GetAtt ContainerPipelineRole.Arn
     Export:
       Name: !Join ["-", [!Ref "AWS::StackName", "ContainerPipelineRoleArn"]]
+  PipelineRoleName:
+    Description: Pipeline Role Name
+    Value: !Ref ContainerPipelineRole
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName", "ContainerPipelineRoleName"]]
   PipelineTriggerRoleArn:
     Description: Generic role allowing triggering our pipelines
     Value: !GetAtt PipelineTriggerRole.Arn
