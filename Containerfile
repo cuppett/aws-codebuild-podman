@@ -1,4 +1,4 @@
-FROM registry.fedoraproject.org/fedora:35
+FROM registry.fedoraproject.org/fedora:36
 
 ENV SUMMARY="Image which allows using podman in AWS CodeBuild." \
     DESCRIPTION="Image which allows using podman in AWS CodeBuild." \
@@ -32,9 +32,9 @@ RUN set -ex; \
 # Preparing container tools support for CodeBuild kernels
 RUN set -ex; \
     touch /etc/containers/nodocker; \
-    sed -i 's/,metacopy\=on//g' /etc/containers/storage.conf; \
-    sed -i 's/\#mount_program/mount_program/g' /etc/containers/storage.conf; \
     echo "[engine]" > /etc/containers/containers.conf; \
     echo "image_default_format = \"v2s2\"" >> /etc/containers/containers.conf; \
     echo "events_logger = \"file\"" >> /etc/containers/containers.conf; \
     echo "cgroup_manager = \"cgroupfs\"" >> /etc/containers/containers.conf;
+
+COPY storage.conf /etc/containers/storage.conf

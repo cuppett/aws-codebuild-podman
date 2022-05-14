@@ -135,9 +135,9 @@ Those elements are captured both in the [Containerfile](Containerfile) and also 
 
 As of this writing here are the versions used/observed in this project:
 
-* Fedora: 35
-* Podman: 3.4.1 go1.16.8
-* CodeBuild kernel: 4.14.225-121.362.amzn1.x86_64
+* Fedora: 36
+* Podman: 4.1.0 go1.18
+* CodeBuild kernel: 4.14.246-187.474.amzn2.x86_64
 
 Once again, you will create a new CloudFormation stack this time using the 
 02_codebuild_projects.yaml template.
