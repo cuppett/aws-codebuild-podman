@@ -3,7 +3,7 @@ FROM registry.fedoraproject.org/fedora:36
 ENV SUMMARY="Image which allows using podman in AWS CodeBuild." \
     DESCRIPTION="Image which allows using podman in AWS CodeBuild." \
     NAME=aws-codebuild-podman \
-    VERSION=34
+    VERSION=36
 
 LABEL summary="$SUMMARY" \
       description="$DESCRIPTION" \
@@ -17,7 +17,6 @@ LABEL summary="$SUMMARY" \
 
 # Installing OS support
 RUN set -ex; \
-    \
     dnf -y install \
         awscli \
         golang \
