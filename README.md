@@ -15,6 +15,8 @@ This repository provides the templates and descriptions needed to provision code
 repositories, container image repositories, and the build jobs + pipelines needed to
 use podman in AWS CodeBuild.
 
+Inspired by: [AWS DevOps Blog: Creating multi-architecture Docker images to support Graviton2 using AWS CodeBuild and AWS CodePipeline](https://aws.amazon.com/blogs/devops/creating-multi-architecture-docker-images-to-support-graviton2-using-aws-codebuild-and-aws-codepipeline/)
+
 ## Capabilities
 
 - [x] Create all required resources with [CloudFormation][cloudformation]
