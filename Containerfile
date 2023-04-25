@@ -1,9 +1,9 @@
-FROM registry.fedoraproject.org/fedora:37
+FROM registry.fedoraproject.org/fedora:38
 
 ENV SUMMARY="Image which allows using podman in AWS CodeBuild." \
     DESCRIPTION="Image which allows using podman in AWS CodeBuild." \
     NAME=aws-codebuild-podman \
-    VERSION=37
+    VERSION=38
 
 LABEL summary="$SUMMARY" \
       description="$DESCRIPTION" \
