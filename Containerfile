@@ -13,7 +13,8 @@ LABEL summary="$SUMMARY" \
       name="$FGC/$NAME" \
       version="$VERSION" \
       usage="This image can be used inside AWS CodeBuild to perform container builds." \
-      maintainer="Stephen Cuppett <scuppett@redhat.com>"
+      maintainer="Stephen Cuppett <steve@cuppett.com>" \
+      org.opencontainers.image.source="https://github.com/cuppett/aws-codebuild-podman"
 
 # Installing OS support
 RUN set -ex; \
