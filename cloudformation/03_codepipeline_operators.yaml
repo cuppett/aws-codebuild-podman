@@ -109,6 +109,7 @@ Resources:
           'Fn::Sub': '${BuildStackName}-PipelineBucket'
         Type: S3
       Name: !Ref "AWS::StackName"
+      PipelineType: V2
       RoleArn: !ImportValue
         'Fn::Sub': '${BuildStackName}-ContainerPipelineRoleArn'
       Stages:
