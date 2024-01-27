@@ -18,6 +18,7 @@ LABEL summary="$SUMMARY" \
 
 # Installing OS support
 RUN set -ex; \
+    dnf -y update; \
     dnf -y install \
         awscli \
         golang \
