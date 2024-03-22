@@ -1,9 +1,8 @@
-FROM registry.fedoraproject.org/fedora:39
+FROM quay.io/podman/stable
 
 ENV SUMMARY="Image which allows using podman in AWS CodeBuild." \
     DESCRIPTION="Image which allows using podman in AWS CodeBuild." \
-    NAME=aws-codebuild-podman \
-    VERSION=39
+    NAME=aws-codebuild-podman
 
 LABEL summary="$SUMMARY" \
       description="$DESCRIPTION" \
@@ -22,7 +21,6 @@ RUN set -ex; \
     dnf -y install \
         awscli \
         golang \
-        podman \
         podman-docker \
         make \
         source-to-image \
@@ -30,12 +28,3 @@ RUN set -ex; \
     dnf -y clean all; \
     rm -rf /var/cache/dnf
 
-# Preparing container tools support for CodeBuild kernels
-RUN set -ex; \
-    touch /etc/containers/nodocker; \
-    echo "[engine]" > /etc/containers/containers.conf; \
-    echo "image_default_format = \"v2s2\"" >> /etc/containers/containers.conf; \
-    echo "events_logger = \"file\"" >> /etc/containers/containers.conf; \
-    echo "cgroup_manager = \"cgroupfs\"" >> /etc/containers/containers.conf;
-
-COPY storage.conf /etc/containers/storage.conf
