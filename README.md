@@ -119,7 +119,7 @@ and how that may correspond to the things in the Containerfile or any other
 idiosyncrasies observed or recorded in the logs.
 
 ```bash
-$ podman manifest push aws-codebuild-podman \
+$ podman manifest push --compression-format=gzip --format v2s2 aws-codebuild-podman \
   123456789.dkr.ecr.us-east-1.amazonaws.com/aws-codebuild-podman:latest
 ```
 Upon successful completion of this command, the image is now available in AWS, and we can 
