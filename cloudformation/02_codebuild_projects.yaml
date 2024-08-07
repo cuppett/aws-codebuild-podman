@@ -138,6 +138,15 @@ Resources:
                 Resource:
                   - !GetAtt PipelineBucket.Arn
                   - !Join ["", [!GetAtt PipelineBucket.Arn, "/*" ]]
+        - PolicyName: !Join [ "-", [ !Ref "AWS::StackName", "codebuild-codestarconnection-policy" ] ]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Effect: "Allow"
+              Action:
+              - "codestar-connections:UseConnection"
+              Resource:
+              - "*"
 
   Amd64Build:
     Type: AWS::CodeBuild::Project

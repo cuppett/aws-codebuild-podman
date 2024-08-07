@@ -197,6 +197,7 @@ Resources:
                 Configuration:
                   ConnectionArn: !Ref CodeStarConnectionArn
                   BranchName: !Ref Branch
+                  OutputArtifactFormat: CODEBUILD_CLONE_REF
                   DetectChanges: !If [EnableSourceTrigger, true, false]
                   FullRepositoryId: !ImportValue
                     'Fn::Sub': '${RepositoryStackName}-SourceRepositoryName'
