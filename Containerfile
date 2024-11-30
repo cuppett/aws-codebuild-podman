@@ -8,12 +8,13 @@ LABEL summary="$SUMMARY" \
       description="$DESCRIPTION" \
       io.k8s.description="$DESCRIPTION" \
       io.k8s.display-name="AWS CodeBuild with Podman" \
-      com.redhat.component="$NAME" \
-      name="$FGC/$NAME" \
-      version="$VERSION" \
+      name="$NAME" \
+      version="stable" \
       usage="This image can be used inside AWS CodeBuild to perform container builds." \
-      maintainer="Stephen Cuppett <steve@cuppett.com>" \
-      org.opencontainers.image.source="https://github.com/cuppett/aws-codebuild-podman"
+      maintainer="Stephen Cuppett steve@cuppett.com" \
+      org.opencontainers.image.source="https://github.com/cuppett/aws-codebuild-podman" \
+      org.opencontainers.image.url="ghcr.io/cuppett/aws-codebuild-podman" \
+      org.opencontainers.image.documentation="https://github.com/cuppett/aws-codebuild-podman/blob/main/README.md"
 
 # Installing OS support
 RUN set -ex; \
