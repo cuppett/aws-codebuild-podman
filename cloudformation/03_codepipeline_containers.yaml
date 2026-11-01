@@ -27,6 +27,7 @@ Parameters:
   CodeStarConnectionArn:
     Description: ARN of the connection (for GitHub or Bitbucket repositories)
     Type: String
+    Default: ""
   RepositoryStackName:
     Description: Name of the stack containing source and image repositories
     Type: String
