@@ -47,6 +47,15 @@ Parameters:
     MinValue: 1
     Default: 7
 
+  HostKernel:
+    Description: Host kernel for on-demand builds (AL2 4.14 is EOL; Fedora 45+ systemd needs the 6.x syscalls)
+    Type: String
+    Default: LINUX_KERNEL_6
+    AllowedValues:
+      - "LINUX_KERNEL_4"
+      - "LINUX_KERNEL_6"
+      - "LINUX_KERNEL_LATEST"
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -57,6 +66,7 @@ Metadata:
           - BuildTimeout
           - Amd64BuildSize
           - SquashLayers
+          - HostKernel
       - Label:
           default: "Logging"
         Parameters:
@@ -71,6 +81,8 @@ Metadata:
         default: "Size (AMD64)"
       SquashLayers:
         default: "Squash Layers"
+      HostKernel:
+        default: "Host Kernel"
       LogsEnabled:
         default: "Enabled"
       LogRetention:
@@ -160,6 +172,7 @@ Resources:
         Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
         ImagePullCredentialsType: SERVICE_ROLE
         PrivilegedMode: true
+        HostKernel: !Ref HostKernel
         Type: LINUX_CONTAINER
         EnvironmentVariables:
           - Name: AWS_ACCOUNT_ID
@@ -215,6 +228,7 @@ Resources:
         Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
         ImagePullCredentialsType: SERVICE_ROLE
         PrivilegedMode: true
+        HostKernel: !Ref HostKernel
         Type: ARM_CONTAINER
         EnvironmentVariables:
           - Name: AWS_ACCOUNT_ID
