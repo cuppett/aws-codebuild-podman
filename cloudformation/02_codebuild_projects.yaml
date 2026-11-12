@@ -284,6 +284,7 @@ Resources:
         Image: !Join ["", [!Ref "AWS::AccountId", ".dkr.ecr.", !Ref "AWS::Region", ".amazonaws.com/", !Ref BuildImageName]]
         ImagePullCredentialsType: SERVICE_ROLE
         PrivilegedMode: true
+        HostKernel: !Ref HostKernel
         Type: LINUX_CONTAINER
         EnvironmentVariables:
           - Name: AWS_ACCOUNT_ID
